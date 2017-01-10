@@ -4,6 +4,8 @@ import os
 import numpy as np
 import cv2
 
+from os.path import expanduser
+
 IMAGE_SIZE = 64
 
 
@@ -39,11 +41,11 @@ labels = []
 def traverse_dir(path):
     for file_or_dir in os.listdir(path):
         abs_path = os.path.abspath(os.path.join(path, file_or_dir))
-        print(abs_path)
+        # print(abs_path)
         if os.path.isdir(abs_path):  # dir
             traverse_dir(abs_path)
         else:                        # file
-            if file_or_dir.endswith('.jpg'):
+            if file_or_dir.endswith('.jpg') or file_or_dir.endswith('.png'):
                 image = read_image(abs_path)
                 images.append(image)
                 labels.append(path)
@@ -62,5 +64,57 @@ def extract_data(path):
     images, labels = traverse_dir(path)
     images = np.array(images)
     labels = np.array([0 if label.endswith('boss') else 1 for label in labels])
-
     return images, labels
+
+def read_face_scrub_csv():
+    home = expanduser("~")
+    path = home + '/datasets/face_scrub/download'
+    print path
+
+    actor_id = 0
+    dict_actor_id = {}
+    dict_id_actor = {}
+    images = []
+    labels = []
+
+    for actor in os.listdir(path):
+        abs_path = os.path.abspath(os.path.join(path, actor))
+        # print(abs_path)
+        thumnails_path = abs_path + '/face'
+        if actor_id == 5:
+            images = np.array(images)
+            labels = np.array(labels)
+            return images, labels, dict_actor_id, dict_id_actor
+        if os.path.isdir(thumnails_path):
+            dict_actor_id[actor] = actor_id
+            dict_id_actor[actor_id] = actor
+            for actor_picture in os.listdir(thumnails_path):
+                image_path = thumnails_path + '/'+ actor_picture
+                if image_path.endswith('.jpg') or file_or_dir.endswith('.png') or file_or_dir.endswith('.JPG'):
+                    # print actor, image_path
+                    image = cv2.imread(image_path)
+
+                    # cv2.imshow('image',image)
+                    # cv2.waitKey()
+                    image = cv2.resize(image, (IMAGE_SIZE,IMAGE_SIZE))
+
+                    # cv2.imshow('image',image)
+                    # cv2.waitKey()
+
+                    images.append(image)
+                    labels.append(actor_id)
+            actor_id += 1
+    # print dict_actor_id
+    # print dict_id_actor
+
+    # images = np.array(images)
+    # labels = np.array(labels)
+    return images, labels, dict_actor_id, dict_id_actor
+
+        # if os.path.isdir(abs_path):  # dir
+        #     traverse_dir(abs_path)
+        # else:                        # file
+        #     if file_or_dir.endswith('.jpg') or file_or_dir.endswith('.png'):
+        #         image = read_image(abs_path)
+        #         images.append(image)
+        #         labels.append(path)

@@ -13,7 +13,7 @@ from keras.utils import np_utils
 from keras.models import load_model
 from keras import backend as K
 
-from boss_input import extract_data, resize_with_pad, IMAGE_SIZE
+from boss_input import extract_data, resize_with_pad, IMAGE_SIZE, read_face_scrub_csv
 
 
 class Dataset(object):
@@ -25,10 +25,25 @@ class Dataset(object):
         self.Y_train = None
         self.Y_valid = None
         self.Y_test = None
+        self.nb_classes = None
 
     def read(self, img_rows=IMAGE_SIZE, img_cols=IMAGE_SIZE, img_channels=3, nb_classes=2):
-        images, labels = extract_data('./data/')
+        # images_1, labels_1 = extract_data('./data/')
+        images, labels, dict_actor_id, dict_id_actor = read_face_scrub_csv()
+
+        nb_classes = len(dict_id_actor.keys())
+
         labels = np.reshape(labels, [-1])
+        # print(len(images),len(labels))
+        # print(len(images_1),len(labels_1))
+
+        # print(len(images[0]))
+        # print(len(images_1[0]))
+
+        # print(len(images[1]))
+        # print(len(images_1[1]))
+
+
         # numpy.reshape
         X_train, X_test, y_train, y_test = train_test_split(images, labels, test_size=0.3, random_state=random.randint(0, 100))
         X_valid, X_test, y_valid, y_test = train_test_split(images, labels, test_size=0.5, random_state=random.randint(0, 100))
@@ -54,6 +69,7 @@ class Dataset(object):
         Y_valid = np_utils.to_categorical(y_valid, nb_classes)
         Y_test = np_utils.to_categorical(y_test, nb_classes)
 
+
         X_train = X_train.astype('float32')
         X_valid = X_valid.astype('float32')
         X_test = X_test.astype('float32')
@@ -67,6 +83,7 @@ class Dataset(object):
         self.Y_train = Y_train
         self.Y_valid = Y_valid
         self.Y_test = Y_test
+        self.nb_classes = nb_classes
 
 
 class Model(object):
@@ -107,12 +124,13 @@ class Model(object):
         sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
         self.model.compile(loss='categorical_crossentropy',
                            optimizer=sgd,
-                           metrics=['accuracy'])
+                           metrics=['fmeasure','accuracy','precision','recall',])
         if not data_augmentation:
             print('Not using data augmentation.')
             self.model.fit(dataset.X_train, dataset.Y_train,
                            batch_size=batch_size,
                            nb_epoch=nb_epoch,
+                           class_weight={'0':145.0,'1':1.0},
                            validation_data=(dataset.X_valid, dataset.Y_valid),
                            shuffle=True)
         else:
@@ -140,6 +158,7 @@ class Model(object):
                                                   batch_size=batch_size),
                                      samples_per_epoch=dataset.X_train.shape[0],
                                      nb_epoch=nb_epoch,
+                                     class_weight={0:145.0,1:1.0},
                                      validation_data=(dataset.X_valid, dataset.Y_valid))
 
     def save(self, file_path=FILE_PATH):
@@ -153,17 +172,20 @@ class Model(object):
     def predict(self, image):
         if image.shape != (1, 3, IMAGE_SIZE, IMAGE_SIZE):
             image = resize_with_pad(image)
-            image = image.reshape((1, 3, IMAGE_SIZE, IMAGE_SIZE))
+            image = image.reshape((1, IMAGE_SIZE, IMAGE_SIZE, 3))
+            # image = image.reshape((1, 3, IMAGE_SIZE, IMAGE_SIZE))
+        print(image.shape)
         image = image.astype('float32')
         image /= 255
         result = self.model.predict_proba(image)
-        print(result)
+        print("RESULT: ", result)
         result = self.model.predict_classes(image)
 
         return result[0]
 
     def evaluate(self, dataset):
         score = self.model.evaluate(dataset.X_test, dataset.Y_test, verbose=0)
+        print(score)
         print("%s: %.2f%%" % (self.model.metrics_names[1], score[1] * 100))
 
 if __name__ == '__main__':
@@ -172,9 +194,10 @@ if __name__ == '__main__':
 
     model = Model()
     model.build_model(dataset)
+
     model.train(dataset, nb_epoch=10)
-    model.save()
+    model.save('boss_save')
 
     model = Model()
-    model.load()
+    model.load('boss_save')
     model.evaluate(dataset)
