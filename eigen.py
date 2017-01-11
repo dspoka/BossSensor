@@ -1,4 +1,5 @@
 """
+http://scikit-learn.org/stable/auto_examples/applications/face_recognition.html
 ===================================================
 Faces recognition example using eigenfaces and SVMs
 ===================================================
@@ -44,7 +45,48 @@ from sklearn.externals import joblib
 
 import os
 import sys
-from boss_input import read_face_scrub_csv
+
+from boss_input import read_face_scrub_csv, IMAGE_SIZE
+
+class Eigen(object):
+  def __init__(self):
+      self.h = None
+      self.w = None
+      self.n_samples = None
+      self.n_classes = None
+      self.n_features = None
+      self.images = None
+      self.labels = None
+      self.dict_actor_id = None
+      self.dict_id_actor = None
+      self.target_names = None
+
+  def get_data(self):
+    images, labels, dict_actor_id, dict_id_actor = read_face_scrub_csv()
+    h = IMAGE_SIZE
+    w = IMAGE_SIZE
+    n_features = h*w*3
+    n_samples = len(images)
+    n_classes = len(dict_id_actor.keys())
+    target_names = list(dict_id_actor.values())
+
+    print("Total dataset size:")
+    print("n_samples: %d" % n_samples)
+    print("n_features: %d" % n_features)
+    print("n_classes: %d" % n_classes)
+
+
+    self.h = h
+    self.w = w
+    self.n_samples = n_samples
+    self.n_classes = n_classes
+    self.n_features = n_features
+    self.images = images
+    self.labels = labels
+    self.dict_actor_id = dict_actor_id
+    self.dict_id_actor = dict_id_actor
+    self.target_names = target_names
+
 
 
 def plot_gallery(images, titles, h, w, n_row=3, n_col=4):
@@ -67,71 +109,50 @@ def title(y_pred, y_test, target_names, i):
     return 'predicted: %s\ntrue:      %s' % (pred_name, true_name)
 
 
+def get_pca(x, n_components):
+  t0 = time()
+  pca = PCA(n_components=n_components, svd_solver='randomized',
+            whiten=True).fit(x)
+  print("done in %0.3fs" % (time() - t0))
+  print(pca)
+  print(dir(pca))
+  print(pca.get_params(deep=True))
+
+  return pca
+
+
+
 def eigen_main():
   print(__doc__)
-
   # Display progress logs on stdout
   logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
-  images, labels, dict_actor_id, dict_id_actor = read_face_scrub_csv()
+  eigen = Eigen()
+  eigen.get_data()
+  flat_images = eigen.images.reshape(len(eigen.images),-1)
 
-  n_samples = len(images)
-  h = 64
-  w = 64
-  n_classes = len(dict_id_actor.keys())
-  print(n_classes)
-  n_features = 64*64*3
-
-  ###############################################################################
-  # Download the data, if not already on disk and load it as numpy arrays
-
-  # lfw_people = fetch_lfw_people(min_faces_per_person=3, resize=0.4)
-
-  # introspect the images arrays to find the shapes (for plotting)
-  # n_samples, h, w = lfw_people.images.shape
-
-  # for machine learning we use the 2 data directly (as relative pixel
-  # positions info is ignored by this model)
-  # X = lfw_people.data
-  # n_features = X.shape[1]
-
-  # the label to predict is the id of the person
-  # y = lfw_people.target
-  # target_names = lfw_people.target_names
-  # print(target_names)
-  # n_classes = target_names.shape[0]
-
-
-  target_names = list(dict_id_actor.values())
-
-  print("Total dataset size:")
-  print("n_samples: %d" % n_samples)
-  print("n_features: %d" % n_features)
-  print("n_classes: %d" % n_classes)
-
-  flat_images = images.reshape(len(images),-1)
-
-
-  ###############################################################################
   # Split into a training set and a test set using a stratified k fold
-
-  # split into a training and testing set
   X_train, X_test, y_train, y_test = train_test_split(
-      flat_images, labels, test_size=0.25, random_state=42)
+      flat_images, eigen.labels, test_size=0.25, random_state=42)
 
-  ###############################################################################
+
   # Compute a PCA (eigenfaces) on the face dataset (treated as unlabeled
   # dataset): unsupervised feature extraction / dimensionality reduction
+
   n_components = 150
+  pca = get_pca(X_train, n_components)
 
-  print("Extracting the top %d eigenfaces from %d faces"
-        % (n_components, X_train.shape[0]))
-  t0 = time()
-  pca = PCA(n_components=n_components, svd_solver='randomized',
-            whiten=True).fit(X_train)
-  print("done in %0.3fs" % (time() - t0))
+  eigenfaces = pca.components_.reshape((n_components, eigen.h, eigen.w, 3))
 
-  eigenfaces = pca.components_.reshape((n_components, h, w, 3))
+  # print(eigenfaces)
+  # os.exit()
+  # print("Extracting the top %d eigenfaces from %d faces"
+  #       % (n_components, X_train.shape[0]))
+  # t0 = time()
+  # pca = PCA(n_components=n_components, svd_solver='randomized',
+  #           whiten=True).fit(X_train)
+  # print("done in %0.3fs" % (time() - t0))
+  # eigenfaces = pca.components_.reshape((n_components, h, w, 3))
 
   print("Projecting the input data on the eigenfaces orthonormal basis")
   t0 = time()
@@ -142,6 +163,8 @@ def eigen_main():
 
   ###############################################################################
   # Train a SVM classification model
+
+
 
   print("Fitting the classifier to the training set")
   t0 = time()
@@ -168,8 +191,8 @@ def eigen_main():
   y_pred = clf.predict(X_test_pca)
   print("done in %0.3fs" % (time() - t0))
 
-  print(classification_report(y_test, y_pred, target_names=target_names))
-  print(confusion_matrix(y_test, y_pred, labels=range(n_classes)))
+  print(classification_report(y_test, y_pred, target_names=eigen.target_names))
+  print(confusion_matrix(y_test, y_pred, labels=range(eigen.n_classes)))
 
 
   ###############################################################################
@@ -177,7 +200,7 @@ def eigen_main():
 
 
 
-  prediction_titles = [title(y_pred, y_test, target_names, i)
+  prediction_titles = [title(y_pred, y_test, eigen.target_names, i)
                        for i in range(y_pred.shape[0])]
 
   # plot_gallery(X_test, prediction_titles, h, w)

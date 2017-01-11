@@ -81,7 +81,7 @@ def read_face_scrub_csv():
         abs_path = os.path.abspath(os.path.join(path, actor))
         # print(abs_path)
         thumnails_path = abs_path + '/face'
-        if actor_id == 71:
+        if actor_id == 3:
             images = np.array(images)
             labels = np.array(labels)
             return images, labels, dict_actor_id, dict_id_actor
@@ -107,15 +107,7 @@ def read_face_scrub_csv():
             actor_id += 1
     # print dict_actor_id
     # print dict_id_actor
-
     # images = np.array(images)
     # labels = np.array(labels)
-    return images, labels, dict_actor_id, dict_id_actor
 
-        # if os.path.isdir(abs_path):  # dir
-        #     traverse_dir(abs_path)
-        # else:                        # file
-        #     if file_or_dir.endswith('.jpg') or file_or_dir.endswith('.png'):
-        #         image = read_image(abs_path)
-        #         images.append(image)
-        #         labels.append(path)
+    return images, labels, dict_actor_id, dict_id_actor
