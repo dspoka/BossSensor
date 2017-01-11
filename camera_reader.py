@@ -5,12 +5,20 @@ from boss_train import Model
 from image_show import show_image
 import os
 
+from boss_input import read_face_scrub_csv
+from eigen import eigen_main
+from sklearn.externals import joblib
+
 def write_crop(file_name, image):
     new_file = './data/boss/' + file_name
     abs_path = os.path.abspath(new_file)
     print abs_path
     cv2.imwrite(abs_path, image)
 
+def predict_SVM(image):
+    flat_image = image.reshape(1,-1)
+    image_pca = pca.transform(flat_image)
+    return clf.predict(image_pca)
 
 if __name__ == '__main__':
     cap = cv2.VideoCapture(0)
@@ -18,6 +26,10 @@ if __name__ == '__main__':
     model = Model()
     model.load('boss_save')
     i = 0
+
+    pca = eigen_main()
+    clf = joblib.load('eigen.pkl')
+
     while True:
         _, frame = cap.read()
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -36,16 +48,22 @@ if __name__ == '__main__':
                 x, y = rect[0:2]
                 width, height = rect[2:4]
                 image = frame[y - 10: y + height, x: x + width]
-                # cv2.imshow('image',image)
+                cv2.imshow('image',image)
                 file_name = str(i) + '.jpg'
 
-                write_crop(file_name,image)
+                image = cv2.resize(image, (64,64))
+
+                # write_crop(file_name,image)
                 # result = model.predict(image)
                 # print result
-                # if result == 0:
-                #     print('Boss is approaching')
-                # else:
-                #     print('Not boss')
+
+                result = predict_SVM(image)
+                print(result)
+
+                if result == 69:
+                    print('Boss is approaching')
+                else:
+                    print('Not boss')
 
         k = cv2.waitKey(1000)
         # returns k is -1

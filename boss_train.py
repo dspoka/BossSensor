@@ -30,7 +30,7 @@ class Dataset(object):
     def read(self, img_rows=IMAGE_SIZE, img_cols=IMAGE_SIZE, img_channels=3, nb_classes=2):
         # images_1, labels_1 = extract_data('./data/')
         images, labels, dict_actor_id, dict_id_actor = read_face_scrub_csv()
-
+        print(dict_id_actor)
         nb_classes = len(dict_id_actor.keys())
 
         labels = np.reshape(labels, [-1])
@@ -158,7 +158,6 @@ class Model(object):
                                                   batch_size=batch_size),
                                      samples_per_epoch=dataset.X_train.shape[0],
                                      nb_epoch=nb_epoch,
-                                     class_weight={0:145.0,1:1.0},
                                      validation_data=(dataset.X_valid, dataset.Y_valid))
 
     def save(self, file_path=FILE_PATH):
@@ -193,7 +192,7 @@ if __name__ == '__main__':
     dataset.read()
 
     model = Model()
-    model.build_model(dataset)
+    model.build_model(dataset, dataset.nb_classes)
 
     model.train(dataset, nb_epoch=10)
     model.save('boss_save')
