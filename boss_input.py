@@ -49,14 +49,12 @@ def traverse_dir(path):
                 image = read_image(abs_path)
                 images.append(image)
                 labels.append(path)
-
     return images, labels
 
 
 def read_image(file_path):
     image = cv2.imread(file_path)
     image = resize_with_pad(image, IMAGE_SIZE, IMAGE_SIZE)
-
     return image
 
 
@@ -69,7 +67,6 @@ def extract_data(path):
 def read_face_scrub_csv():
     home = expanduser("~")
     path = home + '/datasets/face_scrub/download'
-    print path
 
     actor_id = 0
     dict_actor_id = {}
@@ -79,9 +76,8 @@ def read_face_scrub_csv():
 
     for actor in os.listdir(path):
         abs_path = os.path.abspath(os.path.join(path, actor))
-        # print(abs_path)
         thumnails_path = abs_path + '/face'
-        if actor_id == 3:
+        if actor_id == 71:
             images = np.array(images)
             labels = np.array(labels)
             return images, labels, dict_actor_id, dict_id_actor
@@ -105,9 +101,7 @@ def read_face_scrub_csv():
                     images.append(image)
                     labels.append(actor_id)
             actor_id += 1
-    # print dict_actor_id
-    # print dict_id_actor
-    # images = np.array(images)
-    # labels = np.array(labels)
 
+    images = np.array(images)
+    labels = np.array(labels)
     return images, labels, dict_actor_id, dict_id_actor

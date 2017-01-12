@@ -13,6 +13,7 @@ from keras.utils import np_utils
 from keras.models import load_model
 from keras import backend as K
 
+from eigen import Eigen
 from boss_input import extract_data, resize_with_pad, IMAGE_SIZE, read_face_scrub_csv
 
 
@@ -188,15 +189,19 @@ class Model(object):
         print("%s: %.2f%%" % (self.model.metrics_names[1], score[1] * 100))
 
 if __name__ == '__main__':
-    dataset = Dataset()
-    dataset.read()
+    # dataset = Dataset()
+    # dataset.read()
 
-    model = Model()
-    model.build_model(dataset, dataset.nb_classes)
+    # model = Model()
+    # model.build_model(dataset, dataset.nb_classes)
 
-    model.train(dataset, nb_epoch=10)
-    model.save('boss_save')
+    # model.train(dataset, nb_epoch=10)
+    # model.save('boss_save')
 
-    model = Model()
-    model.load('boss_save')
-    model.evaluate(dataset)
+    # model = Model()
+    # model.load('boss_save')
+    # model.evaluate(dataset)
+
+    eigen = Eigen()
+    eigen.get_data()
+    eigen.train_eigen()

@@ -87,7 +87,45 @@ class Eigen(object):
     self.dict_id_actor = dict_id_actor
     self.target_names = target_names
 
+  def train_eigen(self):
+    print(__doc__)
+    # Display progress logs on stdout
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
+    flat_images = self.images.reshape(len(self.images),-1)
+
+    # Split into a training set and a test set using a stratified k fold
+    X_train, X_test, y_train, y_test = train_test_split(
+        flat_images, self.labels, test_size=0.25, random_state=42)
+
+    n_components = 150
+    pca = get_pca(X_train, n_components)
+
+    eigenfaces = pca.components_.reshape((n_components, self.h, self.w, 3))
+
+    X_train_pca = pca.transform(X_train)
+    X_test_pca = pca.transform(X_test)
+
+    clf = train_svm(X_train_pca, y_train)
+
+    print("Predicting people's names on the test set")
+    t0 = time()
+    y_pred = clf.predict(X_test_pca)
+    print("done in %0.3fs" % (time() - t0))
+    print(classification_report(y_test, y_pred, target_names=self.target_names))
+    print(confusion_matrix(y_test, y_pred, labels=range(self.n_classes)))
+
+
+    # Qualitative evaluation of the predictions using matplotlib
+    # prediction_titles = [title(y_pred, y_test, self.target_names, i)
+                         # for i in range(y_pred.shape[0])]
+    # plot_gallery(X_test, prediction_titles, h, w)
+    # plot the gallery of the most significative eigenfaces
+    # eigenface_titles = ["eigenface %d" % i for i in range(eigenfaces.shape[0])]
+    # plot_gallery(eigenfaces, eigenface_titles, h, w)
+    # plt.show()
+
+    return pca, clf
 
 def plot_gallery(images, titles, h, w, n_row=3, n_col=4):
     """Helper function to plot a gallery of portraits"""
@@ -100,19 +138,32 @@ def plot_gallery(images, titles, h, w, n_row=3, n_col=4):
         plt.xticks(())
         plt.yticks(())
 
-
-# plot the result of the prediction on a portion of the test set
-
 def title(y_pred, y_test, target_names, i):
     pred_name = target_names[y_pred[i]].rsplit(' ', 1)[-1]
     true_name = target_names[y_test[i]].rsplit(' ', 1)[-1]
     return 'predicted: %s\ntrue:      %s' % (pred_name, true_name)
 
+def train_svm(X_train_pca, y_train):
+  print("Fitting the classifier to the training set")
+  t0 = time()
+  param_grid = {'C': [1e3],
+                'gamma': [0.0005], }
+
+  clf = GridSearchCV(SVC(kernel='rbf', class_weight='balanced'), param_grid)
+  clf = clf.fit(X_train_pca, y_train)
+  print("done in %0.3fs" % (time() - t0))
+  print("Best estimator found by grid search:")
+  # print(clf.best_estimator_)
+
+  joblib.dump(clf, 'svm.pkl')
+
+  return clf
 
 def get_pca(x, n_components):
   t0 = time()
   pca = PCA(n_components=n_components, svd_solver='randomized',
             whiten=True).fit(x)
+  joblib.dump(pca, 'pca.pkl')
   print("done in %0.3fs" % (time() - t0))
   print(pca)
   print(dir(pca))
@@ -120,99 +171,9 @@ def get_pca(x, n_components):
 
   return pca
 
+def load_eigen():
+  clf = joblib.load('svm.pkl')
+  pca = joblib.load('pca.pkl')
 
+  return pca, clf
 
-def eigen_main():
-  print(__doc__)
-  # Display progress logs on stdout
-  logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-
-  eigen = Eigen()
-  eigen.get_data()
-  flat_images = eigen.images.reshape(len(eigen.images),-1)
-
-  # Split into a training set and a test set using a stratified k fold
-  X_train, X_test, y_train, y_test = train_test_split(
-      flat_images, eigen.labels, test_size=0.25, random_state=42)
-
-
-  # Compute a PCA (eigenfaces) on the face dataset (treated as unlabeled
-  # dataset): unsupervised feature extraction / dimensionality reduction
-
-  n_components = 150
-  pca = get_pca(X_train, n_components)
-
-  eigenfaces = pca.components_.reshape((n_components, eigen.h, eigen.w, 3))
-
-  # print(eigenfaces)
-  # os.exit()
-  # print("Extracting the top %d eigenfaces from %d faces"
-  #       % (n_components, X_train.shape[0]))
-  # t0 = time()
-  # pca = PCA(n_components=n_components, svd_solver='randomized',
-  #           whiten=True).fit(X_train)
-  # print("done in %0.3fs" % (time() - t0))
-  # eigenfaces = pca.components_.reshape((n_components, h, w, 3))
-
-  print("Projecting the input data on the eigenfaces orthonormal basis")
-  t0 = time()
-  X_train_pca = pca.transform(X_train)
-  X_test_pca = pca.transform(X_test)
-  print("done in %0.3fs" % (time() - t0))
-
-
-  ###############################################################################
-  # Train a SVM classification model
-
-
-
-  print("Fitting the classifier to the training set")
-  t0 = time()
-  param_grid = {'C': [1e3],
-                'gamma': [0.0005], }
-
-# SVC(C=1000.0, cache_size=200, class_weight='balanced', coef0=0.0,
-#   decision_function_shape=None, degree=3, gamma=0.005, kernel='rbf',
-#   max_iter=-1, probability=False, random_state=None, shrinking=True,
-#   tol=0.001, verbose=False)
-
-  clf = GridSearchCV(SVC(kernel='rbf', class_weight='balanced'), param_grid)
-  clf = clf.fit(X_train_pca, y_train)
-  print("done in %0.3fs" % (time() - t0))
-  print("Best estimator found by grid search:")
-  print(clf.best_estimator_)
-
-
-  ###############################################################################
-  # Quantitative evaluation of the model quality on the test set
-
-  print("Predicting people's names on the test set")
-  t0 = time()
-  y_pred = clf.predict(X_test_pca)
-  print("done in %0.3fs" % (time() - t0))
-
-  print(classification_report(y_test, y_pred, target_names=eigen.target_names))
-  print(confusion_matrix(y_test, y_pred, labels=range(eigen.n_classes)))
-
-
-  ###############################################################################
-  # Qualitative evaluation of the predictions using matplotlib
-
-
-
-  prediction_titles = [title(y_pred, y_test, eigen.target_names, i)
-                       for i in range(y_pred.shape[0])]
-
-  # plot_gallery(X_test, prediction_titles, h, w)
-
-  # plot the gallery of the most significative eigenfaces
-
-  # eigenface_titles = ["eigenface %d" % i for i in range(eigenfaces.shape[0])]
-  # plot_gallery(eigenfaces, eigenface_titles, h, w)
-
-  # plt.show()
-
-  joblib.dump(clf, 'eigen.pkl')
-  return pca
-
-# clf = joblib.load('filename.pkl')
